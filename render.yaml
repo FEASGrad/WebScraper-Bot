@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: faculty-scraper
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "streamlit run app.py"
+    plan: free
