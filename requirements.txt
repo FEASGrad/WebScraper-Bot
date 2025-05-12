@@ -2,3 +2,7 @@ streamlit
 pandas
 openpyxl
 playwright
+
+# Install Chromium after pip dependencies
+# This line executes after installing requirements
+--extra-index-url https://download.pytorch.org/whl/cpu
