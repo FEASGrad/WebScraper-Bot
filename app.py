@@ -1,19 +1,28 @@
 import streamlit as st
-import asyncio
-from scraper import scrape_streaming
+import pandas as pd
+import google.generativeai as genai
 
-st.title("📘 Faculty Research Scraper")
+# Setup Gemini API
+genai.configure(api_key="AIzaSyA-fV7I7YcLr5KiYHzK4Ug84P0eEC9m79E")
+model = genai.GenerativeModel("gemini-pro")
 
-if st.button("Start Scraping"):
-    status = st.empty()
-    progress = []
+st.title("🤖 Professor Recommender Bot")
 
-    async def run_scraper():
-        async for msg in scrape_streaming():
-            progress.append(msg)
-            status.text("\n".join(progress[-10:]))
+uploaded_file = st.file_uploader("Upload Faculty Excel File (.xlsx)", type="xlsx")
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
 
-    asyncio.run(run_scraper())
+    user_query = st.text_input("Ask a research-related question:")
+    
+    if user_query:
+        context = ""
+        for i, row in df.iterrows():
+            context += f"Name: {row['Name']}\nLink: {row['Profile Link']}\nResearch: {row['All Text']}\n\n"
 
-    with open("Faculty_Academic_Interests.xlsx", "rb") as f:
-        st.download_button("📥 Download Excel", f, "Faculty_Academic_Interests.xlsx")
+        prompt = f"""
+        Based on the following professor data, recommend those whose research matches this query: "{user_query}".
+        Return names and profile links. Data:\n\n{context}
+        """
+
+        response = model.generate_content(prompt)
+        st.markdown(response.text)

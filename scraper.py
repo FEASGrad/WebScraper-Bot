@@ -1,61 +1,61 @@
-import asyncio
+from playwright.sync_api import sync_playwright
 import pandas as pd
-import os
-from openpyxl import load_workbook
-from playwright.async_api import async_playwright
+import time
 
-async def scroll_to_load_all(page):
-    previous_height = 0
-    while True:
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await asyncio.sleep(1.5)
-        current_height = await page.evaluate("document.body.scrollHeight")
-        if current_height == previous_height:
-            break
-        previous_height = current_height
-
-async def scrape_streaming():
+def scrape():
+    # Create an Excel writer with append mode
     filename = "Faculty_Academic_Interests.xlsx"
-    if not os.path.exists(filename):
-        pd.DataFrame(columns=["Name", "Profile Link", "All Text"]).to_excel(filename, index=False)
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+    # Create an empty DataFrame and save to Excel if the file doesn't exist
+    if not pd.io.common.file_exists(filename):
+        df = pd.DataFrame(columns=["Name", "Profile Link", "All Text"])
+        df.to_excel(filename, index=False)
 
-        yield "🔎 Navigating to faculty list page..."
-        await page.goto("https://www.torontomu.ca/engineering-architectural-science/about/faculty-search/")
-        await page.wait_for_selector("a.name", timeout=10000)
+    with sync_playwright() as p:
+        # Launch Chromium browser in headless mode
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-        yield "📜 Scrolling to load all profiles..."
-        await scroll_to_load_all(page)
+        # Open the faculty page you want to scrape
+        print("Navigating to the faculty list page...")
+        page.goto("https://www.torontomu.ca/engineering-architectural-science/about/faculty-search/")
+        page.wait_for_selector("a.name", timeout=10000)  # Wait for faculty links to appear (timeout is 10 seconds)
 
+        # Find faculty name links on the page
         faculty_links = page.locator("a.name")
-        names = await faculty_links.all_inner_texts()
-        hrefs = await faculty_links.evaluate_all("els => els.map(el => el.href)")
+        names = faculty_links.all_inner_texts()  # Extract names
+        hrefs = faculty_links.evaluate_all("els => els.map(el => el.href)")  # Extract links to profiles
 
-        yield f"👨‍🏫 Found {len(names)} faculty members!"
+        print(f"Found {len(names)} faculty members!")
 
+        # Scrape all text from the individual profile pages
+        data = []
         for name, link in zip(names, hrefs):
             try:
-                yield f"🔍 Scraping {name}..."
-                prof_page = await browser.new_page()
-                await prof_page.goto(link)
-                await prof_page.wait_for_load_state("domcontentloaded")
+                print(f"Scraping profile of {name}...")
+                prof_page = browser.new_page()
+                prof_page.goto(link)
+                prof_page.wait_for_load_state('domcontentloaded')  # Ensure the page loads completely before proceeding
 
-                all_text = await prof_page.locator("body").inner_text()
+                # Extract all text from the profile page
+                all_text = prof_page.inner_text("body")  # Extract all text in the body
+
+                # Add the data for this professor and append it to the Excel file
                 new_entry = pd.DataFrame([[name, link, all_text]], columns=["Name", "Profile Link", "All Text"])
 
-                book = load_workbook(filename)
-                start_row = book.active.max_row
+                # Append to the Excel file
+                with pd.ExcelWriter(filename, mode="a", if_sheet_exists="overlay", engine="openpyxl") as writer:
+                    new_entry.to_excel(writer, index=False, header=False, startrow=writer.sheets["Sheet1"].max_row)
 
-                with pd.ExcelWriter(filename, mode="a", engine="openpyxl", if_sheet_exists="overlay") as writer:
-                    new_entry.to_excel(writer, index=False, header=False, startrow=start_row)
+                print(f"Saved data for {name} to Excel.")
 
-                await prof_page.close()
-                yield f"✅ Saved data for {name}."
+                prof_page.close()
             except Exception as e:
-                yield f"❌ Error with {name}: {e}"
+                print(f"Error while processing {name}: {e}")
+        
+        # Close the browser
+        browser.close()
+        print(f"Scraping completed. Data saved to {filename}.")
 
-        await browser.close()
-        yield "✅ Scraping complete!"
+if __name__ == "__main__":
+    scrape()
