@@ -2,27 +2,68 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 
-# Setup Gemini API
+# Configure Gemini API
 genai.configure(api_key="AIzaSyA-fV7I7YcLr5KiYHzK4Ug84P0eEC9m79E")
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 st.title("🤖 Professor Recommender Bot")
 
 uploaded_file = st.file_uploader("Upload Faculty Excel File (.xlsx)", type="xlsx")
+
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    user_query = st.text_input("Ask a research-related question:")
-    
-    if user_query:
-        context = ""
-        for i, row in df.iterrows():
-            context += f"Name: {row['Name']}\nLink: {row['Profile Link']}\nResearch: {row['All Text']}\n\n"
+    # Prepare professor context once
+    prof_context = ""
+    for _, row in df.iterrows():
+        prof_context += f"Name: {row['Name']}\nLink: {row['Profile Link']}\nResearch: {row['All Text']}\n\n"
 
-        prompt = f"""
-        Based on the following professor data, recommend those whose research matches this query: "{user_query}".
-        Return names and profile links. Data:\n\n{context}
-        """
+    # Initialize state
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "user_input" not in st.session_state:
+        st.session_state.user_input = ""
 
-        response = model.generate_content(prompt)
-        st.markdown(response.text)
+    # Display chat history
+    for user_q, bot_r in st.session_state.chat_history:
+        st.markdown(f"**You:** {user_q}")
+        st.markdown(f"**Bot:** {bot_r}")
+
+    # Chat input form
+    with st.form("chat_form", clear_on_submit=True):
+        user_input = st.text_input("Ask a research-related question:", value="")
+        submitted = st.form_submit_button("Ask")
+
+    # Handle submission
+    if submitted and user_input:
+        # Save user input to session
+        st.session_state.user_input = user_input
+
+        # Build full prompt context
+        chat_prompt = f"""
+You are an expert assistant helping students find professors based on their research interests.
+You will be given a list of professors and their research areas. Recommend 4 professors whose research best matches the query.
+Include profile links and 5-sentence summaries of their work.
+
+Professor Data:
+{prof_context}
+
+Conversation so far:
+"""
+        for u, b in st.session_state.chat_history:
+            chat_prompt += f"User: {u}\nBot: {b}\n"
+        chat_prompt += f"User: {user_input}\nBot:"
+
+        with st.spinner("🤖 Thinking..."):
+            try:
+                response = model.generate_content(chat_prompt)
+                reply = response.text.strip()
+            except Exception as e:
+                reply = f"❌ Error: {e}"
+
+        # Append to history and clear input
+        st.session_state.chat_history.append((user_input, reply))
+        st.session_state.user_input = ""
+
+        # Force immediate refresh to show reply and input again
+        st.rerun()
