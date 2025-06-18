@@ -42,8 +42,8 @@ if uploaded_file:
         # Build full prompt context
         chat_prompt = f"""
 You are an expert assistant helping students find professors based on their research interests.
-You will be given a list of professors and their research areas. Recommend 4 professors whose research best matches the query.
-Include profile links and 5-sentence summaries of their work. Only aswer with the names of the professors and their links and research areas.
+You will be given a list of professors and their research areas. Recommend 6 professors whose research best matches the query.
+Include profile links and 5-sentence summaries of their work. Only aswer with the names of the professors and their links and research areas in paragraph form.
 
 Professor Data:
 {prof_context}
