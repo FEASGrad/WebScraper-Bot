@@ -3,7 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 
 # Configure Gemini API
-genai.configure(api_key="AIzaSyA-fV7I7YcLr5KiYHzK4Ug84P0eEC9m79E")
+genai.configure(api_key="AIzaSyCEzcqYkqH3H32Y4S2PdzgAQ1Q_4sgR3t4 ")
 model = genai.GenerativeModel("gemini-2.0-flash")
 
 st.title("🤖 Professor Recommender Bot")
